@@ -68,10 +68,21 @@ builder.Services.AddSwaggerGen(options =>
         [new OpenApiSecuritySchemeReference("Bearer", document)] = []
     });
 });
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:5174")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 // -----------------------------
 
 var app = builder.Build();
-
+app.UseCors("AllowFrontend");
 // Enable Swagger Middleware in Development
 if (app.Environment.IsDevelopment())
 {
