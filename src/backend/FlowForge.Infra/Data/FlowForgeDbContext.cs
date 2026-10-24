@@ -1,14 +1,15 @@
 ﻿using FlowForge.Core.Entities;
 using FlowForge.Core.Interfaces;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlowForge.Infra.Data;
 
-public class FlowForgeDbContext : DbContext
+// Change inheritance to IdentityDbContext<ApplicationUser>
+public class FlowForgeDbContext : IdentityDbContext<ApplicationUser>
 {
     private readonly ICurrentTenantService? _tenantService;
 
-    // We expose this property so EF Core can evaluate it dynamically in the query filter
     public Guid? CurrentTenantId => _tenantService?.TenantId;
 
     public FlowForgeDbContext(
@@ -23,9 +24,8 @@ public class FlowForgeDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        base.OnModelCreating(modelBuilder);
+        base.OnModelCreating(modelBuilder); // Required for Identity tables
 
-        // GLOBAL QUERY FILTER: Automatically scopes all project queries to the current tenant
         modelBuilder.Entity<Project>().HasQueryFilter(p => p.TenantId == CurrentTenantId);
     }
 
@@ -33,7 +33,6 @@ public class FlowForgeDbContext : DbContext
     {
         foreach (var entry in ChangeTracker.Entries<BaseEntity>().Where(e => e.State == EntityState.Added))
         {
-            // Auto-assign the TenantId on creation so developers don't have to remember it
             if (CurrentTenantId.HasValue)
             {
                 entry.Entity.TenantId = CurrentTenantId.Value;
