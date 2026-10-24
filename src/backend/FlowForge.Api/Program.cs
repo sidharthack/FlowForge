@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,13 +46,44 @@ builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantService, HttpCurrentTenantService>();
 
+// --- SWAGGER CONFIGURATION ---
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "FlowForge API", Version = "v1" });
+
+    // Define the JWT Bearer security scheme
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header. \r\n\r\nEnter your token in the text input below.\r\n(Swagger automatically adds the 'Bearer ' prefix).",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer"
+    });
+
+    // Apply the security scheme globally to all endpoints
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
+});
+// -----------------------------
+
 var app = builder.Build();
+
+// Enable Swagger Middleware in Development
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 // Map Endpoints
-app.MapGet("/", () => "FlowForge API is running!");
+app.MapGet("/", () => "FlowForge API is running! Navigate to /swagger to test endpoints.");
 app.MapAuthEndpoints(builder.Configuration);
 
 // Example protected endpoint to test tenant isolation
