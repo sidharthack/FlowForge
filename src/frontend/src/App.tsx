@@ -1,25 +1,25 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AppLayout } from './components/AppLayout';
 import { Login } from './features/auth/Login';
+import { Register } from './features/auth/Register';
 
-// Setup TanStack Query Client
 const queryClient = new QueryClient();
 
-// A simple dashboard to prove authentication works
+// Updated Dashboard - no longer needs its own logout button!
 const Dashboard = () => {
-  const { logout } = useAuth();
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1>Dashboard (Protected)</h1>
-      <p>Welcome to FlowForge! If you see this, you are authenticated.</p>
-      <button onClick={logout} style={{ padding: '8px', background: '#dc3545', color: 'white', border: 'none' }}>
-        Log Out
-      </button>
+    <div>
+      <h1>Dashboard</h1>
+      <p>Welcome to FlowForge! Select an option from the sidebar to get started.</p>
     </div>
   );
 };
+
+// Placeholder for future routes
+const Placeholder = ({ title }: { title: string }) => <h2>{title} Placeholder</h2>;
 
 function App() {
   return (
@@ -29,10 +29,15 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
-            
-            {/* Protected Routes */}
+            <Route path="/register" element={<Register />} />
+
+            {/* Protected Routes wrapped in the AppLayout */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<Dashboard />} />
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/projects" element={<Placeholder title="Projects" />} />
+                <Route path="/clients" element={<Placeholder title="Clients" />} />
+              </Route>
             </Route>
           </Routes>
         </BrowserRouter>
