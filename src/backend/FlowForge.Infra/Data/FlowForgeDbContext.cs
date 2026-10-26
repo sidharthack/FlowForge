@@ -18,23 +18,31 @@ public class FlowForgeDbContext : IdentityDbContext<ApplicationUser>
     }
 
     public DbSet<Tenant> Tenants { get; set; }
+    public DbSet<Client> Clients { get; set; }
     public DbSet<Project> Projects { get; set; }
-    public DbSet<Client> Clients { get; set; } // Added Clients DbSet
+    public DbSet<ProjectTask> Tasks { get; set; } // Added Tasks DbSet
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // GLOBAL QUERY FILTERS for strict tenant isolation
-        modelBuilder.Entity<Project>().HasQueryFilter(p => p.TenantId == CurrentTenantId);
+        // GLOBAL QUERY FILTERS
         modelBuilder.Entity<Client>().HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Project>().HasQueryFilter(p => p.TenantId == CurrentTenantId);
+        modelBuilder.Entity<ProjectTask>().HasQueryFilter(t => t.TenantId == CurrentTenantId);
 
-        // Configure the One-to-Many relationship
         modelBuilder.Entity<Project>()
             .HasOne(p => p.Client)
             .WithMany(c => c.Projects)
             .HasForeignKey(p => p.ClientId)
-            .OnDelete(DeleteBehavior.Restrict); // Prevent deleting a client if they have active projects
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Configure Project -> Tasks relationship
+        modelBuilder.Entity<ProjectTask>()
+            .HasOne(t => t.Project)
+            .WithMany(p => p.Tasks)
+            .HasForeignKey(t => t.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade); // If a project is deleted, delete its tasks
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

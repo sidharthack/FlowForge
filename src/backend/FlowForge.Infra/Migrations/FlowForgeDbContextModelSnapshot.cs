@@ -151,6 +151,40 @@ namespace FlowForge.Infra.Migrations
                     b.ToTable("Projects");
                 });
 
+            modelBuilder.Entity("FlowForge.Core.Entities.ProjectTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("Tasks");
+                });
+
             modelBuilder.Entity("FlowForge.Core.Entities.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -324,6 +358,17 @@ namespace FlowForge.Infra.Migrations
                     b.Navigation("Client");
                 });
 
+            modelBuilder.Entity("FlowForge.Core.Entities.ProjectTask", b =>
+                {
+                    b.HasOne("FlowForge.Core.Entities.Project", "Project")
+                        .WithMany("Tasks")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -378,6 +423,11 @@ namespace FlowForge.Infra.Migrations
             modelBuilder.Entity("FlowForge.Core.Entities.Client", b =>
                 {
                     b.Navigation("Projects");
+                });
+
+            modelBuilder.Entity("FlowForge.Core.Entities.Project", b =>
+                {
+                    b.Navigation("Tasks");
                 });
 #pragma warning restore 612, 618
         }

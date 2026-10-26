@@ -4,9 +4,11 @@ public class Project : BaseEntity
 {
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public string Status { get; set; } = "Active"; // e.g., Active, Completed, OnHold
+    public string Status { get; set; } = "Active";
 
-    // Foreign Key to Client
     public Guid ClientId { get; set; }
     public Client? Client { get; set; }
+
+    // Navigation property: A project contains many tasks
+    public ICollection<ProjectTask> Tasks { get; set; } = new List<ProjectTask>();
 }
