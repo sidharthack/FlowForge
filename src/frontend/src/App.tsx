@@ -5,10 +5,11 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppLayout } from './components/AppLayout';
 import { Login } from './features/auth/Login';
 import { Register } from './features/auth/Register';
+import { Clients } from './features/clients/Clients'; // <-- Import Clients
+import { Projects } from './features/projects/Projects'; // <-- Import Projects
 
 const queryClient = new QueryClient();
 
-// Updated Dashboard - no longer needs its own logout button!
 const Dashboard = () => {
   return (
     <div>
@@ -18,25 +19,20 @@ const Dashboard = () => {
   );
 };
 
-// Placeholder for future routes
-const Placeholder = ({ title }: { title: string }) => <h2>{title} Placeholder</h2>;
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
-            {/* Protected Routes wrapped in the AppLayout */}
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/projects" element={<Placeholder title="Projects" />} />
-                <Route path="/clients" element={<Placeholder title="Clients" />} />
+                <Route path="/projects" element={<Projects />} /> {/* <-- Render Projects */}
+                <Route path="/clients" element={<Clients />} /> {/* <-- Render Clients */}
               </Route>
             </Route>
           </Routes>
