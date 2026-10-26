@@ -97,10 +97,7 @@ app.UseAuthorization();
 app.MapGet("/", () => "FlowForge API is running! Navigate to /swagger to test endpoints.");
 app.MapAuthEndpoints(builder.Configuration);
 
-// Example protected endpoint to test tenant isolation
-app.MapGet("/api/projects", async (FlowForgeDbContext db) => {
-    // This will automatically filter by the logged-in user's TenantId!
-    return await db.Projects.ToListAsync();
-}).RequireAuthorization();
+app.MapClientEndpoints();
+app.MapProjectEndpoints();
 
 app.Run();
