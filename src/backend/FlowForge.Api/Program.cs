@@ -100,4 +100,5 @@ app.MapAuthEndpoints(builder.Configuration);
 app.MapClientEndpoints();
 app.MapProjectEndpoints();
 app.MapTaskEndpoints(); // <-- Add this line
+app.MapUserEndpoints();
 app.Run();

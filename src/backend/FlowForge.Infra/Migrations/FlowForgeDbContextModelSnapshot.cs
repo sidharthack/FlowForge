@@ -157,6 +157,9 @@ namespace FlowForge.Infra.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AssigneeId")
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -179,6 +182,8 @@ namespace FlowForge.Infra.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AssigneeId");
 
                     b.HasIndex("ProjectId");
 
@@ -360,11 +365,18 @@ namespace FlowForge.Infra.Migrations
 
             modelBuilder.Entity("FlowForge.Core.Entities.ProjectTask", b =>
                 {
+                    b.HasOne("FlowForge.Core.Entities.ApplicationUser", "Assignee")
+                        .WithMany()
+                        .HasForeignKey("AssigneeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("FlowForge.Core.Entities.Project", "Project")
                         .WithMany("Tasks")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Assignee");
 
                     b.Navigation("Project");
                 });

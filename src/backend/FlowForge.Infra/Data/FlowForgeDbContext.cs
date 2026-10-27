@@ -43,6 +43,13 @@ public class FlowForgeDbContext : IdentityDbContext<ApplicationUser>
             .WithMany(p => p.Tasks)
             .HasForeignKey(t => t.ProjectId)
             .OnDelete(DeleteBehavior.Cascade); // If a project is deleted, delete its tasks
+
+        // NEW: Configure Task -> Assignee relationship
+        modelBuilder.Entity<ProjectTask>()
+            .HasOne(t => t.Assignee)
+            .WithMany()
+            .HasForeignKey(t => t.AssigneeId)
+            .OnDelete(DeleteBehavior.SetNull); // If user is deleted, just unassign the task
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
