@@ -10,6 +10,13 @@ interface TaskDto {
     description: string;
     status: string;
     projectId: string;
+    assigneeId: string | null;
+    assigneeName: string | null;
+}
+
+interface UserDto {
+    id: string;
+    name: string;
 }
 
 const COLUMNS = ['To Do', 'In Progress', 'Done'];
@@ -26,62 +33,46 @@ export const ProjectBoard = () => {
         enabled: !!projectId,
     });
 
-    // Create Task Mutation
-    const createTask = useMutation({
-        mutationFn: async (title: string) => {
-            const response = await api.post('/api/tasks', { title, description: '', projectId });
-            return response.data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-            setNewTaskTitle('');
-        }
+    // Fetch Users (for the assignment dropdown)
+    const { data: users = [] } = useQuery<UserDto[]>({
+        queryKey: ['users'],
+        queryFn: async () => (await api.get('/api/users')).data,
     });
 
-    // Update Task Status Mutation (Optimistic Update)
+    // Create Task Mutation
+    const createTask = useMutation({
+        mutationFn: async (title: string) => (await api.post('/api/tasks', { title, description: '', projectId })).data,
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks', projectId] }); setNewTaskTitle(''); }
+    });
+
+    // Update Status Mutation
     const updateStatus = useMutation({
-        mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
-            await api.patch(`/api/tasks/${taskId}/status`, { status });
-        },
+        mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => api.patch(`/api/tasks/${taskId}/status`, { status }),
         onMutate: async (newStatusData) => {
-            // Cancel outgoing refetches so they don't overwrite our optimistic update
             await queryClient.cancelQueries({ queryKey: ['tasks', projectId] });
             const previousTasks = queryClient.getQueryData<TaskDto[]>(['tasks', projectId]);
-
-            // Optimistically update the task in the cache
             queryClient.setQueryData<TaskDto[]>(['tasks', projectId], old =>
                 old?.map(task => task.id === newStatusData.taskId ? { ...task, status: newStatusData.status } : task)
             );
-
             return { previousTasks };
         },
-        onError: (_err, _newStatusData, context) => {
-            // Rollback on error
-            if (context?.previousTasks) {
-                queryClient.setQueryData(['tasks', projectId], context.previousTasks);
-            }
+        onError: (err, newStatusData, context) => {
+            if (context?.previousTasks) queryClient.setQueryData(['tasks', projectId], context.previousTasks);
         },
-        onSettled: () => {
-            // Always refetch after error or success to ensure backend sync
-            queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-        }
+        onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
+    });
+
+    // Update Assignee Mutation
+    const updateAssignee = useMutation({
+        mutationFn: async ({ taskId, assigneeId }: { taskId: string; assigneeId: string | null }) =>
+            api.patch(`/api/tasks/${taskId}/assignee`, { assigneeId: assigneeId || null }),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
     });
 
     const onDragEnd = (result: DropResult) => {
         const { destination, source, draggableId } = result;
-
-        // Dropped outside a column or didn't move
-        if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) {
-            return;
-        }
-
-        // Trigger mutation to change status
+        if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) return;
         updateStatus.mutate({ taskId: draggableId, status: destination.droppableId });
-    };
-
-    const handleCreateTask = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newTaskTitle.trim()) createTask.mutate(newTaskTitle);
     };
 
     if (isLoading) return <p>Loading board...</p>;
@@ -93,19 +84,11 @@ export const ProjectBoard = () => {
                 <Link to="/projects" style={{ textDecoration: 'none', color: '#007bff' }}>&larr; Back to Projects</Link>
             </div>
 
-            {/* Add Quick Task */}
-            <form onSubmit={handleCreateTask} style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
-                <input
-                    type="text" placeholder="What needs to be done?"
-                    value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)}
-                    style={{ padding: '8px', width: '300px' }}
-                />
-                <button type="submit" disabled={createTask.isPending} style={{ padding: '9px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}>
-                    Add Task
-                </button>
+            <form onSubmit={e => { e.preventDefault(); if (newTaskTitle.trim()) createTask.mutate(newTaskTitle); }} style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+                <input type="text" placeholder="What needs to be done?" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} style={{ padding: '8px', width: '300px' }} />
+                <button type="submit" disabled={createTask.isPending} style={{ padding: '9px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}>Add Task</button>
             </form>
 
-            {/* Kanban Board */}
             <DragDropContext onDragEnd={onDragEnd}>
                 <div style={{ display: 'flex', gap: '20px', flexGrow: 1, overflowX: 'auto' }}>
                     {COLUMNS.map(columnId => (
@@ -123,16 +106,25 @@ export const ProjectBoard = () => {
                                                         {...provided.draggableProps}
                                                         {...provided.dragHandleProps}
                                                         style={{
-                                                            padding: '12px',
-                                                            marginBottom: '8px',
-                                                            background: '#fff',
-                                                            borderRadius: '4px',
+                                                            padding: '12px', marginBottom: '8px', background: '#fff', borderRadius: '4px',
                                                             boxShadow: snapshot.isDragging ? '0 5px 10px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.1)',
                                                             ...provided.draggableProps.style
                                                         }}
                                                     >
-                                                        <div style={{ fontWeight: '500', fontSize: '14px' }}>{task.title}</div>
-                                                        {task.description && <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '4px' }}>{task.description}</div>}
+                                                        <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '8px' }}>{task.title}</div>
+
+                                                        {/* Assignee Dropdown */}
+                                                        <select
+                                                            value={task.assigneeId || ''}
+                                                            onChange={(e) => updateAssignee.mutate({ taskId: task.id, assigneeId: e.target.value })}
+                                                            style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #ccc', borderRadius: '4px' }}
+                                                        >
+                                                            <option value="">Unassigned</option>
+                                                            {users.map(u => (
+                                                                <option key={u.id} value={u.id}>{u.name}</option>
+                                                            ))}
+                                                        </select>
+
                                                     </div>
                                                 )}
                                             </Draggable>
