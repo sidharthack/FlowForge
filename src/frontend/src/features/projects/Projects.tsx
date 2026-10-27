@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { Link } from 'react-router-dom';
 
 interface ProjectDto {
     id: string;
@@ -92,6 +93,7 @@ export const Projects = () => {
                             <th style={{ padding: '12px', borderBottom: '1px solid #dee2e6', textAlign: 'left' }}>Project Name</th>
                             <th style={{ padding: '12px', borderBottom: '1px solid #dee2e6', textAlign: 'left' }}>Client</th>
                             <th style={{ padding: '12px', borderBottom: '1px solid #dee2e6', textAlign: 'left' }}>Status</th>
+                            <th style={{ padding: '12px', borderBottom: '1px solid #dee2e6', textAlign: 'left' }}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -108,6 +110,15 @@ export const Projects = () => {
                                     <span style={{ padding: '4px 8px', background: '#e2e3e5', borderRadius: '12px', fontSize: '12px' }}>
                                         {project.status}
                                     </span>
+                                </td>
+                                {/* NEW COLUMN: Action link */}
+                                <td style={{ padding: '12px', borderBottom: '1px solid #dee2e6', textAlign: 'right' }}>
+                                    <Link
+                                        to={`/projects/${project.id}/board`}
+                                        style={{ padding: '6px 12px', background: '#007bff', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '12px' }}
+                                    >
+                                        View Board
+                                    </Link>
                                 </td>
                             </tr>
                         ))}

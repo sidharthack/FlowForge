@@ -7,6 +7,7 @@ import { Login } from './features/auth/Login';
 import { Register } from './features/auth/Register';
 import { Clients } from './features/clients/Clients'; // <-- Import Clients
 import { Projects } from './features/projects/Projects'; // <-- Import Projects
+import { ProjectBoard } from './features/tasks/ProjectBoard'; // <-- Import the new component
 
 const queryClient = new QueryClient();
 
@@ -31,8 +32,9 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/projects" element={<Projects />} /> {/* <-- Render Projects */}
-                <Route path="/clients" element={<Clients />} /> {/* <-- Render Clients */}
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/projects/:projectId/board" element={<ProjectBoard />} /> {/* <-- Add this route */}
+                <Route path="/clients" element={<Clients />} />
               </Route>
             </Route>
           </Routes>
