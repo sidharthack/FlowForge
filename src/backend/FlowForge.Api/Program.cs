@@ -16,11 +16,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<FlowForgeDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Identity
+// Identity (UPDATED: Added AddRoles)
 builder.Services.AddIdentityCore<ApplicationUser>(options => {
     options.Password.RequireDigit = true;
     options.Password.RequiredLength = 8;
 })
+.AddRoles<IdentityRole>() // <-- CRITICAL: Enables Role management
 .AddEntityFrameworkStores<FlowForgeDbContext>()
 .AddDefaultTokenProviders();
 
@@ -37,10 +38,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
             ValidAudience = builder.Configuration["JwtSettings:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            RoleClaimType = System.Security.Claims.ClaimTypes.Role // Map standard role claims
         };
     });
-builder.Services.AddAuthorization();
+
+// Authorization Policies (NEW)
+builder.Services.AddAuthorization(options =>
+{
+    // Agencies can do everything; Clients are restricted
+    options.AddPolicy("AgencyOnly", policy => policy.RequireRole("AgencyAdmin", "AgencyMember"));
+
+    // Only Admins can access billing or organization settings
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("AgencyAdmin"));
+});
+
 
 // Tenant Context Resolution
 builder.Services.AddHttpContextAccessor();
@@ -100,4 +112,6 @@ app.MapAuthEndpoints(builder.Configuration);
 app.MapClientEndpoints();
 app.MapProjectEndpoints();
 app.MapTaskEndpoints(); // <-- Add this line
+app.MapUserEndpoints();
+app.MapCommentEndpoints(); // <-- CRITICAL: Verify this line exists!
 app.Run();
