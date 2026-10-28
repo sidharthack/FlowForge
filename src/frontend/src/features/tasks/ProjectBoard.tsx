@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import api from '../../lib/api';
-
+import { TaskComments } from './TaskComments';
 interface TaskDto {
     id: string;
     title: string;
@@ -56,7 +56,7 @@ export const ProjectBoard = () => {
             );
             return { previousTasks };
         },
-        onError: (err, newStatusData, context) => {
+        onError: (_err, _newStatusData, context) => {
             if (context?.previousTasks) queryClient.setQueryData(['tasks', projectId], context.previousTasks);
         },
         onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
@@ -124,7 +124,8 @@ export const ProjectBoard = () => {
                                                                 <option key={u.id} value={u.id}>{u.name}</option>
                                                             ))}
                                                         </select>
-
+                                                        {/* NEW: Comments Component embedded directly into the card */}
+                                                        <TaskComments taskId={task.id} />
                                                     </div>
                                                 )}
                                             </Draggable>
