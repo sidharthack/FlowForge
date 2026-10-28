@@ -3,21 +3,13 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import api from '../../lib/api';
-import { TaskComments } from './TaskComments';
-interface TaskDto {
-    id: string;
-    title: string;
-    description: string;
-    status: string;
-    projectId: string;
-    assigneeId: string | null;
-    assigneeName: string | null;
-}
+import { TaskModal } from './TaskModal';
 
-interface UserDto {
-    id: string;
-    name: string;
+interface TaskDto {
+    id: string; title: string; description: string; status: string;
+    projectId: string; assigneeId: string | null; assigneeName: string | null;
 }
+interface UserDto { id: string; name: string; }
 
 const COLUMNS = ['To Do', 'In Progress', 'Done'];
 
@@ -26,26 +18,25 @@ export const ProjectBoard = () => {
     const queryClient = useQueryClient();
     const [newTaskTitle, setNewTaskTitle] = useState('');
 
-    // Fetch Tasks
+    // NEW: State for tracking the open task modal
+    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
     const { data: tasks = [], isLoading } = useQuery<TaskDto[]>({
         queryKey: ['tasks', projectId],
         queryFn: async () => (await api.get(`/api/projects/${projectId}/tasks`)).data,
         enabled: !!projectId,
     });
 
-    // Fetch Users (for the assignment dropdown)
     const { data: users = [] } = useQuery<UserDto[]>({
         queryKey: ['users'],
         queryFn: async () => (await api.get('/api/users')).data,
     });
 
-    // Create Task Mutation
     const createTask = useMutation({
         mutationFn: async (title: string) => (await api.post('/api/tasks', { title, description: '', projectId })).data,
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks', projectId] }); setNewTaskTitle(''); }
     });
 
-    // Update Status Mutation
     const updateStatus = useMutation({
         mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => api.patch(`/api/tasks/${taskId}/status`, { status }),
         onMutate: async (newStatusData) => {
@@ -62,13 +53,17 @@ export const ProjectBoard = () => {
         onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
     });
 
-    // Update Assignee Mutation
     const updateAssignee = useMutation({
         mutationFn: async ({ taskId, assigneeId }: { taskId: string; assigneeId: string | null }) =>
             api.patch(`/api/tasks/${taskId}/assignee`, { assigneeId: assigneeId || null }),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
     });
-
+    // Update Description Mutation
+    const updateDescription = useMutation({
+        mutationFn: async ({ taskId, description }: { taskId: string; description: string }) =>
+            api.patch(`/api/tasks/${taskId}/description`, { description }),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
+    });
     const onDragEnd = (result: DropResult) => {
         const { destination, source, draggableId } = result;
         if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) return;
@@ -76,6 +71,8 @@ export const ProjectBoard = () => {
     };
 
     if (isLoading) return <p>Loading board...</p>;
+
+    const selectedTask = tasks.find(t => t.id === selectedTaskId);
 
     return (
         <div style={{ fontFamily: 'sans-serif', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -105,27 +102,21 @@ export const ProjectBoard = () => {
                                                         ref={provided.innerRef}
                                                         {...provided.draggableProps}
                                                         {...provided.dragHandleProps}
+                                                        onClick={() => setSelectedTaskId(task.id)} // Click to open modal
                                                         style={{
                                                             padding: '12px', marginBottom: '8px', background: '#fff', borderRadius: '4px',
                                                             boxShadow: snapshot.isDragging ? '0 5px 10px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.1)',
+                                                            cursor: 'pointer', // Show pointer cursor on hover
                                                             ...provided.draggableProps.style
                                                         }}
                                                     >
-                                                        <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '8px' }}>{task.title}</div>
-
-                                                        {/* Assignee Dropdown */}
-                                                        <select
-                                                            value={task.assigneeId || ''}
-                                                            onChange={(e) => updateAssignee.mutate({ taskId: task.id, assigneeId: e.target.value })}
-                                                            style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #ccc', borderRadius: '4px' }}
-                                                        >
-                                                            <option value="">Unassigned</option>
-                                                            {users.map(u => (
-                                                                <option key={u.id} value={u.id}>{u.name}</option>
-                                                            ))}
-                                                        </select>
-                                                        {/* NEW: Comments Component embedded directly into the card */}
-                                                        <TaskComments taskId={task.id} />
+                                                        <div style={{ fontWeight: '500', fontSize: '14px' }}>{task.title}</div>
+                                                        {/* Render a subtle assignee badge if assigned */}
+                                                        {task.assigneeName && (
+                                                            <div style={{ fontSize: '11px', color: '#007bff', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                👤 {task.assigneeName.split('@')[0]}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </Draggable>
@@ -138,6 +129,17 @@ export const ProjectBoard = () => {
                     ))}
                 </div>
             </DragDropContext>
+
+            {/* Render Modal if a task is selected */}
+            {selectedTask && (
+                <TaskModal
+                    task={selectedTask}
+                    users={users}
+                    onClose={() => setSelectedTaskId(null)}
+                    onUpdateAssignee={(taskId, assigneeId) => updateAssignee.mutate({ taskId, assigneeId })}
+                    onUpdateDescription={(taskId, description) => updateDescription.mutate({ taskId, description })}
+                />
+            )}
         </div>
     );
 };

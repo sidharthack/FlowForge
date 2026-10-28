@@ -12,12 +12,10 @@ interface CommentDto {
 export const TaskComments = ({ taskId }: { taskId: string }) => {
     const queryClient = useQueryClient();
     const [content, setContent] = useState('');
-    const [isOpen, setIsOpen] = useState(false); // Toggle to show/hide comments
 
     const { data: comments = [], isLoading } = useQuery<CommentDto[]>({
         queryKey: ['comments', taskId],
         queryFn: async () => (await api.get(`/api/tasks/${taskId}/comments`)).data,
-        enabled: isOpen, // Only fetch if the user opens the comments section!
     });
 
     const createComment = useMutation({
@@ -35,41 +33,36 @@ export const TaskComments = ({ taskId }: { taskId: string }) => {
     };
 
     return (
-        <div style={{ marginTop: '10px', borderTop: '1px solid #e9ecef', paddingTop: '8px' }}>
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: '12px', padding: 0 }}
-            >
-                {isOpen ? 'Hide Comments' : '💬 View/Add Comments'}
-            </button>
+        <div style={{ marginTop: '20px', borderTop: '1px solid #e9ecef', paddingTop: '15px' }}>
+            <h4 style={{ marginBottom: '10px' }}>Comments</h4>
 
-            {isOpen && (
-                <div style={{ marginTop: '10px' }}>
-                    {isLoading ? <span style={{ fontSize: '12px' }}>Loading...</span> : (
-                        <div style={{ maxHeight: '100px', overflowY: 'auto', marginBottom: '8px' }}>
-                            {comments.length === 0 ? <div style={{ fontSize: '12px', color: '#6c757d' }}>No comments yet.</div> : null}
-                            {comments.map(c => (
-                                <div key={c.id} style={{ fontSize: '12px', marginBottom: '6px', background: '#f8f9fa', padding: '6px', borderRadius: '4px' }}>
-                                    <strong style={{ color: '#495057' }}>{c.authorName.split('@')[0]}</strong>: {c.content}
-                                </div>
-                            ))}
+            {isLoading ? <span style={{ fontSize: '14px' }}>Loading comments...</span> : (
+                <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '15px' }}>
+                    {comments.length === 0 ? <div style={{ fontSize: '13px', color: '#6c757d' }}>No comments yet.</div> : null}
+                    {comments.map(c => (
+                        <div key={c.id} style={{ fontSize: '13px', marginBottom: '8px', background: '#f8f9fa', padding: '10px', borderRadius: '4px' }}>
+                            <strong style={{ color: '#495057' }}>{c.authorName.split('@')[0]}</strong>
+                            <span style={{ color: '#adb5bd', fontSize: '11px', marginLeft: '8px' }}>
+                                {new Date(c.createdAt).toLocaleString()}
+                            </span>
+                            <div style={{ marginTop: '4px' }}>{c.content}</div>
                         </div>
-                    )}
-
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '5px' }}>
-                        <input
-                            type="text"
-                            placeholder="Write a comment..."
-                            value={content}
-                            onChange={e => setContent(e.target.value)}
-                            style={{ flexGrow: 1, padding: '4px', fontSize: '12px', border: '1px solid #ccc', borderRadius: '3px' }}
-                        />
-                        <button type="submit" disabled={createComment.isPending} style={{ padding: '4px 8px', fontSize: '12px', background: '#28a745', color: 'white', border: 'none', borderRadius: '3px' }}>
-                            Post
-                        </button>
-                    </form>
+                    ))}
                 </div>
             )}
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px' }}>
+                <input
+                    type="text"
+                    placeholder="Write a comment..."
+                    value={content}
+                    onChange={e => setContent(e.target.value)}
+                    style={{ flexGrow: 1, padding: '8px', fontSize: '13px', border: '1px solid #ccc', borderRadius: '4px' }}
+                />
+                <button type="submit" disabled={createComment.isPending} style={{ padding: '8px 12px', fontSize: '13px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}>
+                    Post
+                </button>
+            </form>
         </div>
     );
 };
