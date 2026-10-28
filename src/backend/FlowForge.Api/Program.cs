@@ -101,4 +101,5 @@ app.MapClientEndpoints();
 app.MapProjectEndpoints();
 app.MapTaskEndpoints(); // <-- Add this line
 app.MapUserEndpoints();
+app.MapCommentEndpoints(); // <-- CRITICAL: Verify this line exists!
 app.Run();

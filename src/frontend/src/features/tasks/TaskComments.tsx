@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import toast from 'react-hot-toast';
 
 interface CommentDto {
     id: string;
@@ -24,7 +25,9 @@ export const TaskComments = ({ taskId }: { taskId: string }) => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['comments', taskId] });
             setContent('');
-        }
+            toast.success('Comment posted');
+        },
+        onError: () => toast.error('Failed to post comment')
     });
 
     const handleSubmit = (e: React.FormEvent) => {

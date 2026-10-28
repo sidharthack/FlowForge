@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import api from '../../lib/api';
 import { TaskModal } from './TaskModal';
+import toast from 'react-hot-toast';
 
 interface TaskDto {
     id: string; title: string; description: string; status: string;
@@ -32,11 +33,18 @@ export const ProjectBoard = () => {
         queryFn: async () => (await api.get('/api/users')).data,
     });
 
+    // Create Task Mutation
     const createTask = useMutation({
         mutationFn: async (title: string) => (await api.post('/api/tasks', { title, description: '', projectId })).data,
-        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks', projectId] }); setNewTaskTitle(''); }
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+            setNewTaskTitle('');
+            toast.success('Task created successfully');
+        },
+        onError: () => toast.error('Failed to create task')
     });
 
+    // Update Status Mutation
     const updateStatus = useMutation({
         mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => api.patch(`/api/tasks/${taskId}/status`, { status }),
         onMutate: async (newStatusData) => {
@@ -49,20 +57,32 @@ export const ProjectBoard = () => {
         },
         onError: (_err, _newStatusData, context) => {
             if (context?.previousTasks) queryClient.setQueryData(['tasks', projectId], context.previousTasks);
+            toast.error('Failed to update task status');
         },
         onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
+        // Note: We skip a success toast here because drag-and-drop is visual enough. A toast every drag gets annoying.
     });
 
+    // Update Assignee Mutation
     const updateAssignee = useMutation({
         mutationFn: async ({ taskId, assigneeId }: { taskId: string; assigneeId: string | null }) =>
             api.patch(`/api/tasks/${taskId}/assignee`, { assigneeId: assigneeId || null }),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+            toast.success('Assignee updated');
+        },
+        onError: () => toast.error('Failed to update assignee')
     });
+
     // Update Description Mutation
     const updateDescription = useMutation({
         mutationFn: async ({ taskId, description }: { taskId: string; description: string }) =>
             api.patch(`/api/tasks/${taskId}/description`, { description }),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+            toast.success('Description saved');
+        },
+        onError: () => toast.error('Failed to save description')
     });
     const onDragEnd = (result: DropResult) => {
         const { destination, source, draggableId } = result;
