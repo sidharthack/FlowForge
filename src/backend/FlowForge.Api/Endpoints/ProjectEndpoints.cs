@@ -39,7 +39,7 @@ public static class ProjectEndpoints
 
             return Results.Created($"/api/projects/{project.Id}",
                 new ProjectDto(project.Id, project.Name, project.Description, project.Status, ""));
-        });
+        }).RequireAuthorization("AgencyOnly"); // <-- ADD THIS POLICY REQUIREMENT    }
     }
 }
 

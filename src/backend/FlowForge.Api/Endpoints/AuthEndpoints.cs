@@ -14,23 +14,29 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/api/auth");
 
-        group.MapPost("/register", async (RegisterRequest req, UserManager<ApplicationUser> userManager, FlowForgeDbContext db) =>
+        // UPDATED: Inject RoleManager
+        group.MapPost("/register", async (RegisterRequest req, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, FlowForgeDbContext db) =>
         {
-            // 1. Create the new Tenant (Organization)
             var tenant = new Tenant { Name = req.OrganizationName };
             db.Tenants.Add(tenant);
             await db.SaveChangesAsync();
 
-            // 2. Create the User linked to the Tenant
-            var user = new ApplicationUser
-            {
-                UserName = req.Email,
-                Email = req.Email,
-                TenantId = tenant.Id
-            };
-
+            var user = new ApplicationUser { UserName = req.Email, Email = req.Email, TenantId = tenant.Id };
             var result = await userManager.CreateAsync(user, req.Password);
             if (!result.Succeeded) return Results.BadRequest(result.Errors);
+
+            // 1. Ensure core roles exist (done on the fly for simplicity)
+            string[] roleNames = { "AgencyAdmin", "AgencyMember", "Client" };
+            foreach (var roleName in roleNames)
+            {
+                if (!await roleManager.RoleExistsAsync(roleName))
+                {
+                    await roleManager.CreateAsync(new IdentityRole(roleName));
+                }
+            }
+
+            // 2. Assign the organization founder as an AgencyAdmin
+            await userManager.AddToRoleAsync(user, "AgencyAdmin");
 
             return Results.Ok(new { Message = "Registration successful." });
         });
@@ -41,17 +47,27 @@ public static class AuthEndpoints
             if (user == null || !await userManager.CheckPasswordAsync(user, req.Password))
                 return Results.Unauthorized();
 
-            // 3. Generate JWT with the TenantId claim
+            // 3. Fetch user roles
+            var roles = await userManager.GetRolesAsync(user);
+
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email!),
+                new Claim("tenantId", user.TenantId.ToString())
+            };
+
+            // 4. Add roles to JWT claims
+            foreach (var role in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.UTF8.GetBytes(configuration["JwtSettings:Secret"]!);
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new[]
-                {
-                    new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-                    new Claim(JwtRegisteredClaimNames.Email, user.Email!),
-                    new Claim("tenantId", user.TenantId.ToString()) // Critical for Isolation
-                }),
+                Subject = new ClaimsIdentity(claims), // Use our dynamic claims list
                 Expires = DateTime.UtcNow.AddMinutes(configuration.GetValue<int>("JwtSettings:ExpirationMinutes")),
                 Issuer = configuration["JwtSettings:Issuer"],
                 Audience = configuration["JwtSettings:Audience"],
