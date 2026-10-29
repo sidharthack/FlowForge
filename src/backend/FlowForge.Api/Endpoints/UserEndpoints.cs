@@ -12,7 +12,6 @@ public static class UserEndpoints
     {
         var group = app.MapGroup("/api/users").RequireAuthorization();
 
-        // 1. Get all users in the current organization
         group.MapGet("/", async (FlowForgeDbContext db, ICurrentTenantService tenantService) =>
         {
             var users = await db.Users
@@ -23,44 +22,50 @@ public static class UserEndpoints
             return Results.Ok(users);
         });
 
-        // 2. Invite a new user to the organization
-        group.MapPost("/invite", async (InviteUserRequest req, UserManager<ApplicationUser> userManager, ICurrentTenantService tenantService) =>
+        group.MapPost("/invite", async (InviteUserRequest req, UserManager<ApplicationUser> userManager, ICurrentTenantService tenantService, FlowForgeDbContext db) =>
         {
-            // Only allow specific roles
             var allowedRoles = new[] { "AgencyMember", "Client" };
             if (!allowedRoles.Contains(req.Role))
                 return Results.BadRequest("Invalid role. Must be 'AgencyMember' or 'Client'.");
 
-            // Prevent duplicate emails
+            // NEW: Enforce ClientId requirement for external clients
+            if (req.Role == "Client")
+            {
+                if (!req.ClientId.HasValue)
+                    return Results.BadRequest("ClientId is required when inviting a Client.");
+
+                var clientExists = await db.Clients.AnyAsync(c => c.Id == req.ClientId.Value);
+                if (!clientExists)
+                    return Results.BadRequest("Invalid Client ID.");
+            }
+
             if (await userManager.FindByEmailAsync(req.Email) != null)
                 return Results.BadRequest("A user with this email already exists.");
 
-            // Create the user inherently bound to the Admin's TenantId
             var user = new ApplicationUser
             {
                 UserName = req.Email,
                 Email = req.Email,
-                TenantId = tenantService.TenantId!.Value
+                TenantId = tenantService.TenantId!.Value,
+                ClientId = req.ClientId // NEW: Associate with the client record
             };
 
-            // MVP Shortcut: Auto-generate a secure temporary password
             var tempPassword = $"Welcome{new Random().Next(1000, 9999)}!";
             var result = await userManager.CreateAsync(user, tempPassword);
 
             if (!result.Succeeded) return Results.BadRequest(result.Errors);
 
-            // Assign the requested role
             await userManager.AddToRoleAsync(user, req.Role);
 
             return Results.Ok(new
             {
                 Message = $"User invited successfully as {req.Role}.",
                 Email = req.Email,
-                TemporaryPassword = tempPassword // The Admin will securely share this with the user
+                TemporaryPassword = tempPassword
             });
-        }).RequireAuthorization("AdminOnly"); // <-- CRITICAL: Only AgencyAdmins can hit this endpoint
+        }).RequireAuthorization("AdminOnly");
     }
 }
 
 public record UserDto(string Id, string Name);
-public record InviteUserRequest(string Email, string Role);
+public record InviteUserRequest(string Email, string Role, Guid? ClientId); // UPDATED

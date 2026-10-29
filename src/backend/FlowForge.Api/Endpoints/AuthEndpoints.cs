@@ -47,7 +47,6 @@ public static class AuthEndpoints
             if (user == null || !await userManager.CheckPasswordAsync(user, req.Password))
                 return Results.Unauthorized();
 
-            // 3. Fetch user roles
             var roles = await userManager.GetRolesAsync(user);
 
             var claims = new List<Claim>
@@ -57,7 +56,12 @@ public static class AuthEndpoints
                 new Claim("tenantId", user.TenantId.ToString())
             };
 
-            // 4. Add roles to JWT claims
+            // NEW: Append ClientId to the token if it exists
+            if (user.ClientId.HasValue)
+            {
+                claims.Add(new Claim("clientId", user.ClientId.Value.ToString()));
+            }
+
             foreach (var role in roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
