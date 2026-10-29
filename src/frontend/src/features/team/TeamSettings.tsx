@@ -10,6 +10,11 @@ interface UserDto {
     name: string;
 }
 
+interface ClientDto {
+    id: string;
+    name: string;
+}
+
 interface InviteResponse {
     message: string;
     email: string;
@@ -22,29 +27,36 @@ export const TeamSettings = () => {
 
     const [email, setEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('AgencyMember');
+    const [clientId, setClientId] = useState(''); // NEW: Track selected client
     const [lastInvite, setLastInvite] = useState<InviteResponse | null>(null);
 
-    // Protect the route at the component level
     if (role !== 'AgencyAdmin') {
         return <Navigate to="/" replace />;
     }
 
     // Fetch Team Members
-    const { data: users = [], isLoading } = useQuery<UserDto[]>({
+    const { data: users = [], isLoading: usersLoading } = useQuery<UserDto[]>({
         queryKey: ['users'],
         queryFn: async () => (await api.get('/api/users')).data,
     });
 
+    // NEW: Fetch Clients for the dropdown
+    const { data: clients = [], isLoading: clientsLoading } = useQuery<ClientDto[]>({
+        queryKey: ['clients'],
+        queryFn: async () => (await api.get('/api/clients')).data,
+    });
+
     // Invite User Mutation
     const inviteUser = useMutation({
-        mutationFn: async (payload: { email: string; role: string }) => {
+        mutationFn: async (payload: { email: string; role: string; clientId: string | null }) => {
             const response = await api.post('/api/users/invite', payload);
             return response.data as InviteResponse;
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
             setEmail('');
-            setLastInvite(data); // Store the response to display the temporary password
+            setClientId(''); // Reset client selection
+            setLastInvite(data);
             toast.success(`${inviteRole} invited successfully!`);
         },
         onError: (error: any) => {
@@ -57,7 +69,18 @@ export const TeamSettings = () => {
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
         if (!email) return;
-        inviteUser.mutate({ email, role: inviteRole });
+
+        // NEW: Validation to ensure a client is selected if the role is Client
+        if (inviteRole === 'Client' && !clientId) {
+            toast.error('Please select a client organization for this user.');
+            return;
+        }
+
+        inviteUser.mutate({
+            email,
+            role: inviteRole,
+            clientId: inviteRole === 'Client' ? clientId : null
+        });
     };
 
     return (
@@ -68,19 +91,36 @@ export const TeamSettings = () => {
             {/* Invite Form */}
             <div style={{ background: '#fff', padding: '20px', border: '1px solid #dee2e6', borderRadius: '4px', marginBottom: '20px' }}>
                 <h3>Invite New User</h3>
-                <form onSubmit={handleInvite} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                <form onSubmit={handleInvite} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
                     <input
                         type="email" placeholder="User's Email Address" value={email}
-                        onChange={e => setEmail(e.target.value)} required style={{ padding: '8px', flexGrow: 1 }}
+                        onChange={e => setEmail(e.target.value)} required style={{ padding: '8px', flexGrow: 1, minWidth: '200px' }}
                     />
+
                     <select
-                        value={inviteRole} onChange={e => setInviteRole(e.target.value)}
-                        style={{ padding: '8px', width: '180px' }}
+                        value={inviteRole} onChange={e => {
+                            setInviteRole(e.target.value);
+                            if (e.target.value !== 'Client') setClientId(''); // Clear client if switching back
+                        }}
+                        style={{ padding: '8px', width: '160px' }}
                     >
                         <option value="AgencyMember">Agency Member</option>
                         <option value="Client">Client</option>
                     </select>
-                    <button type="submit" disabled={inviteUser.isPending} style={{ padding: '9px 15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '4px' }}>
+
+                    {/* NEW: Conditional Client Dropdown */}
+                    {inviteRole === 'Client' && (
+                        <select
+                            value={clientId} onChange={e => setClientId(e.target.value)}
+                            required style={{ padding: '8px', width: '200px' }}
+                            disabled={clientsLoading}
+                        >
+                            <option value="">-- Select Client --</option>
+                            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    )}
+
+                    <button type="submit" disabled={inviteUser.isPending} style={{ padding: '9px 15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                         {inviteUser.isPending ? 'Inviting...' : 'Send Invite'}
                     </button>
                 </form>
@@ -101,7 +141,7 @@ export const TeamSettings = () => {
 
             {/* User Directory */}
             <h3>Organization Directory</h3>
-            {isLoading ? <p>Loading users...</p> : (
+            {usersLoading ? <p>Loading users...</p> : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', border: '1px solid #dee2e6', marginTop: '10px' }}>
                     <thead style={{ background: '#f8f9fa' }}>
                         <tr>
