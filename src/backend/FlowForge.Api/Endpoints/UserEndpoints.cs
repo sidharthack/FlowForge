@@ -1,8 +1,10 @@
 ﻿using FlowForge.Core.Entities;
 using FlowForge.Core.Interfaces;
 using FlowForge.Infra.Data;
+using FlowForge.Infra.Email;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Collections;
 
 namespace FlowForge.Api.Endpoints;
 
@@ -22,8 +24,7 @@ public static class UserEndpoints
             return Results.Ok(users);
         });
 
-        group.MapPost("/invite", async (InviteUserRequest req, UserManager<ApplicationUser> userManager, ICurrentTenantService tenantService, FlowForgeDbContext db) =>
-        {
+        group.MapPost("/invite", async (InviteUserRequest req, UserManager<ApplicationUser> userManager, ICurrentTenantService tenantService, FlowForgeDbContext db, IEmailQueue emailQueue) => {
             var allowedRoles = new[] { "AgencyMember", "Client" };
             if (!allowedRoles.Contains(req.Role))
                 return Results.BadRequest("Invalid role. Must be 'AgencyMember' or 'Client'.");
@@ -56,6 +57,9 @@ public static class UserEndpoints
             if (!result.Succeeded) return Results.BadRequest(result.Errors);
 
             await userManager.AddToRoleAsync(user, req.Role);
+
+            var emailBody = $"Hello!\n\nYou have been invited to FlowForge as a {req.Role}.\nYour temporary password is: {tempPassword}\n\nPlease log in and change it immediately.";
+            await emailQueue.QueueEmailAsync(new EmailMessage(req.Email, "Welcome to FlowForge!", emailBody));
 
             return Results.Ok(new
             {

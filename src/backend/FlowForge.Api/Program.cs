@@ -3,6 +3,7 @@ using FlowForge.Api.Services;
 using FlowForge.Core.Entities;
 using FlowForge.Core.Interfaces;
 using FlowForge.Infra.Data;
+using FlowForge.Infra.Email;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -57,6 +58,14 @@ builder.Services.AddAuthorization(options =>
 // Tenant Context Resolution
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantService, HttpCurrentTenantService>();
+
+// NEW: Email Infrastructure
+// Queue must be a Singleton so the Background Worker and API endpoints share the exact same instance
+builder.Services.AddSingleton<IEmailQueue, EmailQueue>();
+// Service is Transient so it can be safely injected
+builder.Services.AddTransient<IEmailService, DevEmailService>();
+// Register the background worker
+builder.Services.AddHostedService<EmailBackgroundWorker>();
 
 // --- SWAGGER CONFIGURATION ---
 builder.Services.AddEndpointsApiExplorer();
