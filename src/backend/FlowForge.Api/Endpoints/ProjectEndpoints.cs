@@ -1,6 +1,7 @@
 ﻿using FlowForge.Core.Entities;
 using FlowForge.Infra.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace FlowForge.Api.Endpoints;
 
@@ -10,10 +11,27 @@ public static class ProjectEndpoints
     {
         var group = app.MapGroup("/api/projects").RequireAuthorization();
 
-        group.MapGet("/", async (FlowForgeDbContext db) =>
+        // UPDATED: Inject ClaimsPrincipal to verify identity
+        group.MapGet("/", async (ClaimsPrincipal user, FlowForgeDbContext db) =>
         {
-            var projects = await db.Projects
-                .Include(p => p.Client)
+            var query = db.Projects.Include(p => p.Client).AsQueryable();
+
+            // NEW: Restrict data access if the user is a Client
+            if (user.IsInRole("Client"))
+            {
+                var clientIdClaim = user.FindFirst("clientId")?.Value;
+                if (Guid.TryParse(clientIdClaim, out var clientId))
+                {
+                    query = query.Where(p => p.ClientId == clientId);
+                }
+                else
+                {
+                    // Fail-safe: if they are a client but lack a ClientId claim, return empty
+                    return Results.Ok(new List<ProjectDto>());
+                }
+            }
+
+            var projects = await query
                 .Select(p => new ProjectDto(p.Id, p.Name, p.Description, p.Status, p.Client!.Name))
                 .ToListAsync();
 

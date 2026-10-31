@@ -9,6 +9,7 @@ import { Register } from './features/auth/Register';
 import { Clients } from './features/clients/Clients';
 import { Projects } from './features/projects/Projects';
 import { ProjectBoard } from './features/tasks/ProjectBoard';
+import { TeamSettings } from './features/team/TeamSettings'; // <-- Add this import
 
 const queryClient = new QueryClient();
 
@@ -26,13 +27,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
-          {/* NEW: Global Toaster configuration */}
           <Toaster
             position="bottom-right"
-            toastOptions={{
-              duration: 3000,
-              style: { fontSize: '14px', fontFamily: 'sans-serif' }
-            }}
+            toastOptions={{ duration: 3000, style: { fontSize: '14px', fontFamily: 'sans-serif' } }}
           />
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -44,6 +41,9 @@ function App() {
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/projects/:projectId/board" element={<ProjectBoard />} />
                 <Route path="/clients" element={<Clients />} />
+
+                {/* NEW: Add the Team Settings Route */}
+                <Route path="/team" element={<TeamSettings />} />
               </Route>
             </Route>
           </Routes>
