@@ -10,6 +10,7 @@ import { Clients } from './features/clients/Clients';
 import { Projects } from './features/projects/Projects';
 import { ProjectBoard } from './features/tasks/ProjectBoard';
 import { TeamSettings } from './features/team/TeamSettings'; // <-- Add this import
+import { ProfileSettings } from './features/profile/ProfileSettings';
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ function App() {
 
                 {/* NEW: Add the Team Settings Route */}
                 <Route path="/team" element={<TeamSettings />} />
+                <Route path="/profile" element={<ProfileSettings />} /> {/* <-- Add Route */}
               </Route>
             </Route>
           </Routes>

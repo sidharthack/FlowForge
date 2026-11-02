@@ -81,8 +81,33 @@ public static class AuthEndpoints
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return Results.Ok(new { Token = tokenHandler.WriteToken(token) });
         });
+
+        group.MapPost("/change-password", async (ChangePasswordRequest req, ClaimsPrincipal user, UserManager<ApplicationUser> userManager) =>
+        {
+            // Extract the user ID securely from the JWT token
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                      ?? user.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+            if (string.IsNullOrEmpty(userId)) return Results.Unauthorized();
+
+            var appUser = await userManager.FindByIdAsync(userId);
+            if (appUser == null) return Results.NotFound("User not found.");
+
+            // Use ASP.NET Identity's built-in password change method (handles hashing automatically)
+            var result = await userManager.ChangePasswordAsync(appUser, req.CurrentPassword, req.NewPassword);
+
+            if (!result.Succeeded)
+            {
+                // Return identity errors (e.g., password too short, incorrect current password)
+                return Results.BadRequest(result.Errors.Select(e => e.Description));
+            }
+
+            return Results.Ok(new { Message = "Password changed successfully." });
+        }).RequireAuthorization(); // Ensure only logged-in users can access this
     }
+
 }
 
 public record RegisterRequest(string Email, string Password, string OrganizationName);
 public record LoginRequest(string Email, string Password);
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword); // NEW
