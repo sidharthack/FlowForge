@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+import toast from 'react-hot-toast';
 import api from '../../lib/api';
 import { TaskModal } from './TaskModal';
-import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext'; // NEW: Import Auth Context
 
+// ... (interfaces remain the same)
 interface TaskDto {
     id: string; title: string; description: string; status: string;
     projectId: string; assigneeId: string | null; assigneeName: string | null;
@@ -17,11 +19,14 @@ const COLUMNS = ['To Do', 'In Progress', 'Done'];
 export const ProjectBoard = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const queryClient = useQueryClient();
-    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const { role } = useAuth(); // NEW: Extract user role
 
-    // NEW: State for tracking the open task modal
+    const [newTaskTitle, setNewTaskTitle] = useState('');
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
+    const isClient = role === 'Client'; // Determine if user is a client
+
+    // ... (useQuery and useMutation hooks remain EXACTLY the same) ...
     const { data: tasks = [], isLoading } = useQuery<TaskDto[]>({
         queryKey: ['tasks', projectId],
         queryFn: async () => (await api.get(`/api/projects/${projectId}/tasks`)).data,
@@ -33,7 +38,6 @@ export const ProjectBoard = () => {
         queryFn: async () => (await api.get('/api/users')).data,
     });
 
-    // Create Task Mutation
     const createTask = useMutation({
         mutationFn: async (title: string) => (await api.post('/api/tasks', { title, description: '', projectId })).data,
         onSuccess: () => {
@@ -44,7 +48,6 @@ export const ProjectBoard = () => {
         onError: () => toast.error('Failed to create task')
     });
 
-    // Update Status Mutation
     const updateStatus = useMutation({
         mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => api.patch(`/api/tasks/${taskId}/status`, { status }),
         onMutate: async (newStatusData) => {
@@ -60,10 +63,8 @@ export const ProjectBoard = () => {
             toast.error('Failed to update task status');
         },
         onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
-        // Note: We skip a success toast here because drag-and-drop is visual enough. A toast every drag gets annoying.
     });
 
-    // Update Assignee Mutation
     const updateAssignee = useMutation({
         mutationFn: async ({ taskId, assigneeId }: { taskId: string; assigneeId: string | null }) =>
             api.patch(`/api/tasks/${taskId}/assignee`, { assigneeId: assigneeId || null }),
@@ -74,7 +75,6 @@ export const ProjectBoard = () => {
         onError: () => toast.error('Failed to update assignee')
     });
 
-    // Update Description Mutation
     const updateDescription = useMutation({
         mutationFn: async ({ taskId, description }: { taskId: string; description: string }) =>
             api.patch(`/api/tasks/${taskId}/description`, { description }),
@@ -84,7 +84,11 @@ export const ProjectBoard = () => {
         },
         onError: () => toast.error('Failed to save description')
     });
+
     const onDragEnd = (result: DropResult) => {
+        // Prevent drag end execution for clients just in case
+        if (isClient) return;
+
         const { destination, source, draggableId } = result;
         if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) return;
         updateStatus.mutate({ taskId: draggableId, status: destination.droppableId });
@@ -101,10 +105,13 @@ export const ProjectBoard = () => {
                 <Link to="/projects" style={{ textDecoration: 'none', color: '#007bff' }}>&larr; Back to Projects</Link>
             </div>
 
-            <form onSubmit={e => { e.preventDefault(); if (newTaskTitle.trim()) createTask.mutate(newTaskTitle); }} style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
-                <input type="text" placeholder="What needs to be done?" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} style={{ padding: '8px', width: '300px' }} />
-                <button type="submit" disabled={createTask.isPending} style={{ padding: '9px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}>Add Task</button>
-            </form>
+            {/* Conditionally hide the Add Task form for Clients */}
+            {!isClient && (
+                <form onSubmit={e => { e.preventDefault(); if (newTaskTitle.trim()) createTask.mutate(newTaskTitle); }} style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+                    <input type="text" placeholder="What needs to be done?" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} style={{ padding: '8px', width: '300px' }} />
+                    <button type="submit" disabled={createTask.isPending} style={{ padding: '9px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}>Add Task</button>
+                </form>
+            )}
 
             <DragDropContext onDragEnd={onDragEnd}>
                 <div style={{ display: 'flex', gap: '20px', flexGrow: 1, overflowX: 'auto' }}>
@@ -116,22 +123,22 @@ export const ProjectBoard = () => {
                                 {(provided) => (
                                     <div ref={provided.innerRef} {...provided.droppableProps} style={{ flexGrow: 1, minHeight: '150px' }}>
                                         {tasks.filter(t => t.status === columnId).map((task, index) => (
-                                            <Draggable key={task.id} draggableId={task.id} index={index}>
+                                            <Draggable key={task.id} draggableId={task.id} index={index} isDragDisabled={isClient}>
+                                                {/* ^^^ NEW: Disable drag if user is a client */}
                                                 {(provided, snapshot) => (
                                                     <div
                                                         ref={provided.innerRef}
                                                         {...provided.draggableProps}
                                                         {...provided.dragHandleProps}
-                                                        onClick={() => setSelectedTaskId(task.id)} // Click to open modal
+                                                        onClick={() => setSelectedTaskId(task.id)}
                                                         style={{
                                                             padding: '12px', marginBottom: '8px', background: '#fff', borderRadius: '4px',
                                                             boxShadow: snapshot.isDragging ? '0 5px 10px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.1)',
-                                                            cursor: 'pointer', // Show pointer cursor on hover
+                                                            cursor: isClient ? 'pointer' : 'grab', // Change cursor for clients
                                                             ...provided.draggableProps.style
                                                         }}
                                                     >
                                                         <div style={{ fontWeight: '500', fontSize: '14px' }}>{task.title}</div>
-                                                        {/* Render a subtle assignee badge if assigned */}
                                                         {task.assigneeName && (
                                                             <div style={{ fontSize: '11px', color: '#007bff', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                                 👤 {task.assigneeName.split('@')[0]}
@@ -150,11 +157,12 @@ export const ProjectBoard = () => {
                 </div>
             </DragDropContext>
 
-            {/* Render Modal if a task is selected */}
+            {/* Pass readOnly prop to TaskModal */}
             {selectedTask && (
                 <TaskModal
                     task={selectedTask}
                     users={users}
+                    readOnly={isClient}
                     onClose={() => setSelectedTaskId(null)}
                     onUpdateAssignee={(taskId, assigneeId) => updateAssignee.mutate({ taskId, assigneeId })}
                     onUpdateDescription={(taskId, description) => updateDescription.mutate({ taskId, description })}
