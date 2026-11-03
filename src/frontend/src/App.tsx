@@ -11,17 +11,9 @@ import { Projects } from './features/projects/Projects';
 import { ProjectBoard } from './features/tasks/ProjectBoard';
 import { TeamSettings } from './features/team/TeamSettings'; // <-- Add this import
 import { ProfileSettings } from './features/profile/ProfileSettings';
+import { Dashboard } from './features/dashboard/Dashboard'; // <-- NEW IMPORT
 
 const queryClient = new QueryClient();
-
-const Dashboard = () => {
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Welcome to FlowForge! Select an option from the sidebar to get started.</p>
-    </div>
-  );
-};
 
 function App() {
   return (
