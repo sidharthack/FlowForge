@@ -45,6 +45,10 @@ export const AppLayout = () => {
                             Role: {role}
                         </span>
                     )}
+                    {/* NEW: Profile Link */}
+                    <Link to="/profile" style={{ fontSize: '14px', color: '#007bff', textDecoration: 'none', fontWeight: '500' }}>
+                        Profile
+                    </Link>
                     <button
                         onClick={logout}
                         style={{ padding: '8px 16px', backgroundColor: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
